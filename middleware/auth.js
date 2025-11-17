@@ -21,26 +21,19 @@ const getUserAuth = (req, res, next) => {
     const userId = req.headers['x-ms-client-principal-id']; // unique user ID
     const userIdp = req.headers['x-ms-client-principal-idp']; // identity provider (google, microsoft, etc)
 
-    // For local development without Azure Easy Auth
-    if (process.env.NODE_ENV === 'development' && !userPrincipal) {
-        // Use a default test user for local development
-        req.user = {
-            id: 'dev-user-123',
-            name: 'Developer User',
-            email: 'dev@localhost',
-            provider: 'local'
-        };
-        console.log('🔓 Development mode: Using test user');
-        return next();
-    }
-
-    // Check if user is authenticated (Azure Easy Auth enabled)
+    // If Azure Easy Auth headers are not present, use a default user
+    // This allows the app to work before Azure Easy Auth is configured
+    // SECURITY NOTE: Once you enable Azure Easy Auth, all users will have unique IDs
     if (!userPrincipal || !userId) {
-        return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'Authentication required. Please log in.',
-            hint: 'Azure Easy Auth must be enabled. See DEPLOYMENT.md for setup instructions.'
-        });
+        // Use a default user when Easy Auth is not configured
+        req.user = {
+            id: process.env.NODE_ENV === 'development' ? 'dev-user-123' : 'default-user',
+            name: process.env.NODE_ENV === 'development' ? 'Developer User' : 'Anonymous User',
+            email: process.env.NODE_ENV === 'development' ? 'dev@localhost' : 'anonymous@example.com',
+            provider: 'none'
+        };
+        console.log('⚠️  No authentication configured - using default user. Enable Azure Easy Auth for multi-user support.');
+        return next();
     }
 
     // Attach user info to request object

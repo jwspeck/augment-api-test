@@ -13,11 +13,6 @@ const {
 let tasks = [];
 let nextId = 1;
 
-// GET /api/tasks/user → get current user info
-router.get("/user", (req, res) => {
-  res.json(req.user);
-});
-
 // Helper function to find task by id
 const findTaskById = (id) => {
   const taskIndex = tasks.findIndex(t => t.id === id);
@@ -62,6 +57,11 @@ const buildHierarchy = (flatTasks) => {
   sortByOrder(rootTasks);
   return rootTasks;
 };
+
+// GET /api/tasks/user → get current user info
+router.get("/user", (req, res) => {
+  res.json(req.user);
+});
 
 // GET /api/tasks → return all tasks for current user (hierarchical by default)
 router.get("/", (req, res) => {
