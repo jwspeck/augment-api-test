@@ -13,6 +13,8 @@ let currentSearchQuery = '';
 
 // Theme Management
 function setTheme(theme) {
+    console.log('Setting theme to:', theme);
+
     // Remove active class from all theme buttons
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -33,6 +35,8 @@ function setTheme(theme) {
 
     // Save theme preference to localStorage
     localStorage.setItem('theme', theme);
+
+    console.log('Theme applied. Current data-theme:', document.documentElement.getAttribute('data-theme'));
 }
 
 // Load saved theme on page load
