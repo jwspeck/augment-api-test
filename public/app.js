@@ -11,8 +11,39 @@ const searchInput = document.getElementById('searchInput');
 let currentFilter = 'all';
 let currentSearchQuery = '';
 
+// Theme Management
+function setTheme(theme) {
+    // Remove active class from all theme buttons
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Add active class to selected theme button
+    const selectedBtn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
+    if (selectedBtn) {
+        selectedBtn.classList.add('active');
+    }
+
+    // Apply theme to document
+    if (theme === 'default') {
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    // Save theme preference to localStorage
+    localStorage.setItem('theme', theme);
+}
+
+// Load saved theme on page load
+function loadSavedTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'default';
+    setTheme(savedTheme);
+}
+
 // Load tasks and stats on page load
 document.addEventListener('DOMContentLoaded', () => {
+    loadSavedTheme();
     loadTasks();
     loadStats();
 });
