@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager</title>
+    <title>Hierarchical Task Manager</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- SortableJS for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.1/Sortable.min.js"></script>
 </head>
 <body>
     <!-- Theme Switcher -->
@@ -46,6 +48,7 @@
             <h2>Add New Task</h2>
             <form id="taskForm">
                 <input type="text" id="taskTitle" placeholder="Task title" required>
+                <input type="text" id="taskDescription" placeholder="Short description (optional)">
                 <button type="submit">Add Task</button>
             </form>
         </div>
@@ -77,9 +80,38 @@
 
         <div class="tasks-section">
             <h2>Tasks</h2>
-            <div id="tasksList"></div>
+            <div id="tasksList" class="tasks-list"></div>
         </div>
     </div>
+
+    <!-- Details Panel (Slide-in from right) -->
+    <div id="detailsPanel" class="details-panel">
+        <div class="details-header">
+            <h3>Task Details</h3>
+            <button class="btn-close-details" onclick="closeDetailsPanel()">✕</button>
+        </div>
+        <div class="details-content">
+            <div class="details-field">
+                <label>Title</label>
+                <input type="text" id="detailsTitle" class="details-input">
+            </div>
+            <div class="details-field">
+                <label>Description</label>
+                <input type="text" id="detailsDescription" class="details-input">
+            </div>
+            <div class="details-field">
+                <label>Details</label>
+                <textarea id="detailsText" class="details-textarea" rows="10" placeholder="Add detailed notes, requirements, or documentation here..."></textarea>
+            </div>
+            <div class="details-actions">
+                <button class="btn-save-details" onclick="saveTaskDetails()">Save</button>
+                <button class="btn-cancel-details" onclick="closeDetailsPanel()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay for details panel -->
+    <div id="detailsOverlay" class="details-overlay" onclick="closeDetailsPanel()"></div>
 
     <script src="app.js"></script>
 </body>

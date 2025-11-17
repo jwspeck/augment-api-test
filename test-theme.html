@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Test</title>
+    <style>
+        :root {
+            --bg-gradient-start: #667eea;
+            --bg-gradient-end: #764ba2;
+            --container-bg: #ffffff;
+            --text-primary: #333333;
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient-start: #1a1a2e;
+            --bg-gradient-end: #16213e;
+            --container-bg: #0f3460;
+            --text-primary: #e0e0e0;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            background: var(--container-bg);
+            padding: 40px;
+            border-radius: 12px;
+            transition: background 0.3s ease;
+        }
+
+        .theme-switcher {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--container-bg);
+            border-radius: 50px;
+            padding: 12px 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .theme-btn.active {
+            border-color: white;
+            box-shadow: 0 0 0 3px #667eea;
+        }
+
+        .theme-btn[data-theme="default"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .theme-btn[data-theme="dark"] {
+            background: linear-gradient(135deg, #1a1a2e 0%, #e94560 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-switcher">
+        <h4>🎨</h4>
+        <button type="button" class="theme-btn active" data-theme="default" onclick="setTheme('default')"></button>
+        <button type="button" class="theme-btn" data-theme="dark" onclick="setTheme('dark')"></button>
+    </div>
+
+    <div class="container">
+        <h1>Theme Switcher Test</h1>
+        <p>Click the colored circles in the bottom-right corner!</p>
+    </div>
+
+    <script>
+        function setTheme(theme) {
+            console.log('Setting theme to:', theme);
+            
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            const selectedBtn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
+            if (selectedBtn) {
+                selectedBtn.classList.add('active');
+            }
+            
+            if (theme === 'default') {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+            
+            localStorage.setItem('theme', theme);
+            console.log('Theme applied!');
+        }
+
+        // Load saved theme
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'default';
+            setTheme(savedTheme);
+        });
+    </script>
+</body>
+</html>
+
