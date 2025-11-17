@@ -103,5 +103,7 @@ Desktop.ini
 # Azure
 .azure/
 publish-profile.xml
+publish-profile-new.xml
 *.publishsettings
+*.PublishSettings
 
