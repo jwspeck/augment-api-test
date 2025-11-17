@@ -1,5 +1,8 @@
-// API Base URL
+// API Configuration
 const API_URL = '/api/tasks';
+
+// No API key needed - using Azure Easy Auth for user authentication
+// The server will automatically identify the logged-in user
 
 // DOM Elements
 const taskForm = document.getElementById('taskForm');
@@ -16,6 +19,23 @@ let currentSearchQuery = '';
 let allTasks = [];
 let expandedTasks = new Set();
 let currentEditingTask = null;
+
+// Load and display user info
+async function loadUserInfo() {
+    try {
+        const response = await fetch(`${API_URL}/user`);
+        if (response.ok) {
+            const user = await response.json();
+            const userInfoDiv = document.getElementById('userInfo');
+            const userNameSpan = document.getElementById('userName');
+            userNameSpan.textContent = user.name || user.email || 'User';
+            userInfoDiv.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading user info:', error);
+        // In development mode, user info might not be available
+    }
+}
 
 // Theme Management
 function setTheme(theme) {
@@ -48,6 +68,7 @@ function loadSavedTheme() {
 // Load tasks and stats on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadSavedTheme();
+    loadUserInfo();
     loadTasks();
     loadStats();
 });

@@ -1,9 +1,22 @@
 const express = require("express");
 const router = express.Router();
+const { createLimiter } = require("../middleware/rateLimiter");
+const {
+  validateCreateTask,
+  validateUpdateTask,
+  validateTaskId,
+  validateMoveTask,
+  validateSearch
+} = require("../middleware/validation");
 
 // Module-level in-memory storage
 let tasks = [];
 let nextId = 1;
+
+// GET /api/tasks/user → get current user info
+router.get("/user", (req, res) => {
+  res.json(req.user);
+});
 
 // Helper function to find task by id
 const findTaskById = (id) => {
@@ -50,49 +63,56 @@ const buildHierarchy = (flatTasks) => {
   return rootTasks;
 };
 
-// GET /api/tasks → return all tasks (hierarchical by default)
+// GET /api/tasks → return all tasks for current user (hierarchical by default)
 router.get("/", (req, res) => {
   const flat = req.query.flat === 'true';
+  const userId = req.user.id;
+
+  // Filter tasks by current user
+  const userTasks = tasks.filter(t => t.userId === userId);
 
   if (flat) {
-    res.json(tasks);
+    res.json(userTasks);
   } else {
-    res.json(buildHierarchy(tasks));
+    res.json(buildHierarchy(userTasks));
   }
 });
 
-// GET /api/tasks/completed → get all completed tasks
+// GET /api/tasks/completed → get all completed tasks for current user
 router.get("/completed", (req, res) => {
-  const completedTasks = tasks.filter(t => t.done === true);
+  const userId = req.user.id;
+  const completedTasks = tasks.filter(t => t.userId === userId && t.done === true);
   res.json(completedTasks);
 });
 
-// GET /api/tasks/pending → get all pending (not done) tasks
+// GET /api/tasks/pending → get all pending (not done) tasks for current user
 router.get("/pending", (req, res) => {
-  const pendingTasks = tasks.filter(t => t.done === false);
+  const userId = req.user.id;
+  const pendingTasks = tasks.filter(t => t.userId === userId && t.done === false);
   res.json(pendingTasks);
 });
 
-// GET /api/tasks/search?q=query → search tasks by title
-router.get("/search", (req, res) => {
+// GET /api/tasks/search?q=query → search tasks by title for current user
+router.get("/search", validateSearch, (req, res) => {
   const query = req.query.q;
-
-  if (!query) {
-    return res.status(400).json({ error: "Search query 'q' is required" });
-  }
+  const userId = req.user.id;
 
   const searchResults = tasks.filter(task =>
+    task.userId === userId &&
     task.title.toLowerCase().includes(query.toLowerCase())
   );
 
   res.json(searchResults);
 });
 
-// GET /api/tasks/stats → get task statistics
+// GET /api/tasks/stats → get task statistics for current user
 router.get("/stats", (req, res) => {
-  const total = tasks.length;
-  const completed = tasks.filter(t => t.done === true).length;
-  const pending = tasks.filter(t => t.done === false).length;
+  const userId = req.user.id;
+  const userTasks = tasks.filter(t => t.userId === userId);
+
+  const total = userTasks.length;
+  const completed = userTasks.filter(t => t.done === true).length;
+  const pending = userTasks.filter(t => t.done === false).length;
   const completionRate = total > 0 ? ((completed / total) * 100).toFixed(2) : 0;
 
   res.json({
@@ -104,30 +124,28 @@ router.get("/stats", (req, res) => {
 });
 
 // POST /api/tasks { title, description, details, parentId } → create task
-router.post("/", (req, res) => {
+router.post("/", createLimiter, validateCreateTask, (req, res) => {
   const { title, description, details, parentId, order } = req.body;
+  const userId = req.user.id;
 
-  if (!title) {
-    return res.status(400).json({ error: "Title is required" });
-  }
-
-  // Verify parent exists if provided
+  // Verify parent exists if provided (and belongs to current user)
   if (parentId !== null && parentId !== undefined) {
-    const parent = tasks.find(t => t.id === parentId);
+    const parent = tasks.find(t => t.id === parentId && t.userId === userId);
     if (!parent) {
-      return res.status(400).json({ error: "Parent task not found" });
+      return res.status(400).json({ error: "Parent task not found or access denied" });
     }
   }
 
-  // Calculate order if not provided
+  // Calculate order if not provided (only among user's tasks)
   let taskOrder = order;
   if (taskOrder === undefined || taskOrder === null) {
-    const siblings = tasks.filter(t => t.parentId === (parentId || null));
+    const siblings = tasks.filter(t => t.userId === userId && t.parentId === (parentId || null));
     taskOrder = siblings.length > 0 ? Math.max(...siblings.map(t => t.order || 0)) + 1 : 0;
   }
 
   const newTask = {
     id: nextId++,
+    userId,  // Associate task with current user
     title,
     description: description || "",
     details: details || "",
@@ -166,20 +184,32 @@ router.post("/bulk", (req, res) => {
   res.status(201).json(newTasks);
 });
 
-// PATCH /api/tasks/complete-all → mark all tasks as done
+// PATCH /api/tasks/complete-all → mark all user's tasks as done
 router.patch("/complete-all", (req, res) => {
+  const userId = req.user.id;
+  let count = 0;
   tasks.forEach(task => {
-    task.done = true;
+    if (task.userId === userId) {
+      task.done = true;
+      count++;
+    }
   });
-  res.json({ message: "All tasks marked as complete", tasks });
+  const userTasks = tasks.filter(t => t.userId === userId);
+  res.json({ message: `${count} tasks marked as complete`, tasks: userTasks });
 });
 
-// PATCH /api/tasks/uncomplete-all → mark all tasks as not done
+// PATCH /api/tasks/uncomplete-all → mark all user's tasks as not done
 router.patch("/uncomplete-all", (req, res) => {
+  const userId = req.user.id;
+  let count = 0;
   tasks.forEach(task => {
-    task.done = false;
+    if (task.userId === userId) {
+      task.done = false;
+      count++;
+    }
   });
-  res.json({ message: "All tasks marked as incomplete", tasks });
+  const userTasks = tasks.filter(t => t.userId === userId);
+  res.json({ message: `${count} tasks marked as incomplete`, tasks: userTasks });
 });
 
 // PATCH /api/tasks/reorder → reorder tasks by providing array of ids
@@ -204,12 +234,13 @@ router.patch("/reorder", (req, res) => {
 });
 
 // PATCH /api/tasks/:id → update title, done, description, details, parentId, order
-router.patch("/:id", (req, res) => {
+router.patch("/:id", validateUpdateTask, (req, res) => {
   const id = parseInt(req.params.id);
-  const taskIndex = tasks.findIndex(t => t.id === id);
+  const userId = req.user.id;
+  const taskIndex = tasks.findIndex(t => t.id === id && t.userId === userId);
 
   if (taskIndex === -1) {
-    return res.status(404).json({ error: "Task not found" });
+    return res.status(404).json({ error: "Task not found or access denied" });
   }
 
   const { title, done, description, details, parentId, order } = req.body;
@@ -244,10 +275,12 @@ router.patch("/:id", (req, res) => {
   res.json(tasks[taskIndex]);
 });
 
-// DELETE /api/tasks/completed → delete all completed tasks
+// DELETE /api/tasks/completed → delete all user's completed tasks
 router.delete("/completed", (req, res) => {
-  const completedTasks = tasks.filter(t => t.done === true);
-  tasks = tasks.filter(t => t.done === false);
+  const userId = req.user.id;
+  const completedTasks = tasks.filter(t => t.userId === userId && t.done === true);
+  tasks = tasks.filter(t => !(t.userId === userId && t.done === true));
+  setTasks(tasks);
   res.json({
     message: `Deleted ${completedTasks.length} completed tasks`,
     deletedTasks: completedTasks
@@ -255,12 +288,13 @@ router.delete("/completed", (req, res) => {
 });
 
 // DELETE /api/tasks/:id → remove by id (and all subtasks)
-router.delete("/:id", (req, res) => {
+router.delete("/:id", validateTaskId, (req, res) => {
   const id = parseInt(req.params.id);
-  const taskIndex = tasks.findIndex(t => t.id === id);
+  const userId = req.user.id;
+  const taskIndex = tasks.findIndex(t => t.id === id && t.userId === userId);
 
   if (taskIndex === -1) {
-    return res.status(404).json({ error: "Task not found" });
+    return res.status(404).json({ error: "Task not found or access denied" });
   }
 
   // Recursively delete all subtasks
@@ -282,16 +316,23 @@ router.delete("/:id", (req, res) => {
 // POST /api/tasks/:id/duplicate → duplicate a task
 router.post("/:id/duplicate", (req, res) => {
   const id = parseInt(req.params.id);
-  const result = findTaskById(id);
+  const userId = req.user.id;
+  const taskIndex = tasks.findIndex(t => t.id === id && t.userId === userId);
 
-  if (!result) {
-    return res.status(404).json({ error: "Task not found" });
+  if (taskIndex === -1) {
+    return res.status(404).json({ error: "Task not found or access denied" });
   }
 
+  const originalTask = tasks[taskIndex];
   const duplicatedTask = {
     id: nextId++,
-    title: `${result.task.title} (copy)`,
+    userId,  // Associate with current user
+    title: `${originalTask.title} (copy)`,
+    description: originalTask.description || "",
+    details: originalTask.details || "",
     done: false,
+    parentId: originalTask.parentId || null,
+    order: originalTask.order || 0,
     createdAt: new Date().toISOString()
   };
 
@@ -300,12 +341,13 @@ router.post("/:id/duplicate", (req, res) => {
 });
 
 // POST /api/tasks/:id/subtask → create a subtask
-router.post("/:id/subtask", (req, res) => {
+router.post("/:id/subtask", createLimiter, validateCreateTask, (req, res) => {
   const parentId = parseInt(req.params.id);
-  const parent = tasks.find(t => t.id === parentId);
+  const userId = req.user.id;
+  const parent = tasks.find(t => t.id === parentId && t.userId === userId);
 
   if (!parent) {
-    return res.status(404).json({ error: "Parent task not found" });
+    return res.status(404).json({ error: "Parent task not found or access denied" });
   }
 
   const { title, description, details } = req.body;
@@ -314,12 +356,13 @@ router.post("/:id/subtask", (req, res) => {
     return res.status(400).json({ error: "Title is required" });
   }
 
-  // Calculate order for new subtask
-  const siblings = tasks.filter(t => t.parentId === parentId);
+  // Calculate order for new subtask (only among user's tasks)
+  const siblings = tasks.filter(t => t.userId === userId && t.parentId === parentId);
   const taskOrder = siblings.length > 0 ? Math.max(...siblings.map(t => t.order || 0)) + 1 : 0;
 
   const newTask = {
     id: nextId++,
+    userId,  // Associate with current user
     title,
     description: description || "",
     details: details || "",
@@ -335,13 +378,14 @@ router.post("/:id/subtask", (req, res) => {
 });
 
 // PATCH /api/tasks/:id/move → move task to new parent and/or reorder
-router.patch("/:id/move", (req, res) => {
+router.patch("/:id/move", validateMoveTask, (req, res) => {
   const id = parseInt(req.params.id);
+  const userId = req.user.id;
   const { newParentId, newOrder } = req.body;
 
-  const taskIndex = tasks.findIndex(t => t.id === id);
+  const taskIndex = tasks.findIndex(t => t.id === id && t.userId === userId);
   if (taskIndex === -1) {
-    return res.status(404).json({ error: "Task not found" });
+    return res.status(404).json({ error: "Task not found or access denied" });
   }
 
   const task = tasks[taskIndex];
@@ -349,11 +393,11 @@ router.patch("/:id/move", (req, res) => {
 
   // Update parent if provided
   if (newParentId !== undefined) {
-    // Verify new parent exists (unless moving to root)
+    // Verify new parent exists (unless moving to root) and belongs to user
     if (newParentId !== null) {
-      const newParent = tasks.find(t => t.id === newParentId);
+      const newParent = tasks.find(t => t.id === newParentId && t.userId === userId);
       if (!newParent) {
-        return res.status(400).json({ error: "New parent task not found" });
+        return res.status(400).json({ error: "New parent task not found or access denied" });
       }
 
       // Prevent circular reference
